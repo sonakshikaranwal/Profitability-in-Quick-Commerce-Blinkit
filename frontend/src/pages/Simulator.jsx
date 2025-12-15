@@ -2,29 +2,37 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import { TrendingUp, Activity, Save, Zap, Truck, ShoppingBag, CheckCircle, AlertCircle } from 'lucide-react';
+import { TrendingUp, Activity, Save, Zap, Truck, ShoppingBag, CheckCircle } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function Simulator() {
-  const [inputs, setInputs] = useState({
-    company_name: "Blinkit",
-    city_tier: "Tier 1 (Delhi)",
-    aov: 450,
-    orders_per_day: 3000,
-    delivery_cost: 55,
-    commission_rate: 0.15,
-    discount_rate: 5.0,
-    fixed_cost_monthly: 200000
+  // 1. INPUTS STATE (Sticky: Loads from browser memory on refresh)
+  const [inputs, setInputs] = useState(() => {
+    const savedInputs = localStorage.getItem('current_simulation_inputs');
+    return savedInputs ? JSON.parse(savedInputs) : {
+      company_name: "Blinkit",
+      city_tier: "Tier 1 (Delhi)",
+      aov: 450,
+      orders_per_day: 3000,
+      delivery_cost: 55,
+      commission_rate: 0.15,
+      discount_rate: 5.0,
+      fixed_cost_monthly: 200000
+    };
+  });
+
+  // 2. HISTORY STATE (Cache Object: Keyed by Company Name)
+  const [history, setHistory] = useState(() => {
+    return JSON.parse(localStorage.getItem("scenarioCache")) || {};
   });
 
   const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [savedStatus, setSavedStatus] = useState(""); // Feedback text
+  const [savedStatus, setSavedStatus] = useState("");
 
   const entities = [
     { 
-      id: "Blinkit", name: "Blinkit", focus: "Scale-First", desc: "High volume, optimized logistics cost.",
+      id: "Blinkit", name: "Blinkit", focus: "Scale-First", desc: "High volume, optimized logistics.",
       icon: <Truck size={20} />, color: "bg-yellow-100 text-yellow-700",
       defaults: { aov: 450, orders_per_day: 3000, delivery_cost: 55, fixed_cost_monthly: 200000 }
     },
@@ -40,64 +48,77 @@ function Simulator() {
     },
   ];
 
+  // --- HANDLERS ---
   const handleEntitySelect = (entity) => {
-    setInputs(prev => ({ ...prev, company_name: entity.id, ...entity.defaults }));
+    const newInputs = { ...inputs, company_name: entity.id, ...entity.defaults };
+    setInputs(newInputs);
+    localStorage.setItem('current_simulation_inputs', JSON.stringify(newInputs));
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setInputs(prev => ({ ...prev, [name]: name === "company_name" || name === "city_tier" ? value : parseFloat(value) }));
+    const newInputs = { ...inputs, [name]: name === "company_name" || name === "city_tier" ? value : parseFloat(value) };
+    setInputs(newInputs);
+    localStorage.setItem('current_simulation_inputs', JSON.stringify(newInputs));
   };
 
   const handleSimulate = async () => {
     try {
-      // CHANGE URL to your Vercel Backend
+      // Use your Vercel URL here
       const response = await axios.post('https://quick-commerce-backend-livid.vercel.app/simulate', inputs);
       setResult(response.data);
-      setSavedStatus(""); // Clear previous save message
+      setSavedStatus("");
     } catch (error) {
       console.error("Connection Error", error);
     }
   };
 
+  // Auto-calculate on input change
   useEffect(() => {
     const timer = setTimeout(() => handleSimulate(), 500);
     return () => clearTimeout(timer);
   }, [inputs]);
 
+  // --- UPDATED SAVE LOGIC (Overwrite Strategy) ---
   const saveScenario = () => {
     if (!result) return;
-    
-    // 1. Visual Feedback
-    setHistory(prev => [{ inputs: { ...inputs }, result: { ...result }, id: Date.now() }, ...prev]);
 
     try {
-        setSavedStatus("Saving...");
-        
-        // 2. READ EXISTING DATA
-        const existingData = JSON.parse(localStorage.getItem('marketData') || '{}');
-        
-        // 3. UPDATE THIS COMPANY
-        existingData[inputs.company_name] = {
-            ...result,
-            // Ensure we save the AI verdict text too
-            strategic_verdict: result.strategic_verdict, 
-            net_profit_monthly: result.net_profit_monthly,
-            contribution_margin: result.contribution_margin,
-            break_even_orders: result.break_even_orders
-        };
+      setSavedStatus("Saving...");
 
-        // 4. WRITE PERMANENTLY TO BROWSER
-        localStorage.setItem('marketData', JSON.stringify(existingData));
+      // A. Update History Cache (For Sidebar) - Object Merge
+      const updatedCache = {
+        ...history,
+        [inputs.company_name]: {
+          inputs: { ...inputs },
+          result: { ...result },
+          updatedAt: Date.now()
+        }
+      };
 
-        setSavedStatus("✅ Saved to Browser Memory!");
-        setTimeout(() => setSavedStatus(""), 3000);
-    } catch (error) {
-        setSavedStatus("❌ Save Failed");
-        console.error("Save Error", error);
+      setHistory(updatedCache);
+      localStorage.setItem("scenarioCache", JSON.stringify(updatedCache));
+
+      // B. Update Market Data (For Market Analysis Page)
+      const existingData = JSON.parse(localStorage.getItem('marketData') || '{}');
+      existingData[inputs.company_name] = {
+        ...result,
+        strategic_verdict: result.strategic_verdict,
+        net_profit_monthly: result.net_profit_monthly,
+        contribution_margin: result.contribution_margin,
+        break_even_orders: result.break_even_orders
+      };
+      localStorage.setItem('marketData', JSON.stringify(existingData));
+
+      setSavedStatus("✅ Scenario Updated!");
+      setTimeout(() => setSavedStatus(""), 2500);
+    } catch (err) {
+      console.error(err);
+      setSavedStatus("❌ Save Failed");
     }
   };
 
+  // --- CHART DATA ---
   const barData = result ? {
     labels: ['Revenue', 'Var Cost', 'Contribution'],
     datasets: [{
@@ -117,18 +138,18 @@ function Simulator() {
         </div>
         <div className="flex flex-col items-end gap-2">
             <button onClick={saveScenario} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition">
-              <Save size={16} /> Save Scenario
+              <Save size={16} /> Update {inputs.company_name} Scenario
             </button>
             {savedStatus && <span className="text-xs font-bold text-emerald-600 animate-pulse">{savedStatus}</span>}
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* CONTROLS */}
+        {/* LEFT COLUMN: CONTROLS */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
              <div className="mb-6">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">Target Entity Selection</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">Target Entity</label>
                 <div className="space-y-3">
                   {entities.map(c => (
                     <button key={c.id} onClick={() => handleEntitySelect(c)}
@@ -166,14 +187,22 @@ function Simulator() {
               </div>
           </div>
           
-          {history.length > 0 && (
+          {/* UPDATED HISTORY LIST (OBJECT MAP) */}
+          {Object.entries(history).length > 0 && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-semibold text-slate-700 mb-4">📜 Saved Scenarios</h3>
+                <h3 className="font-semibold text-slate-700 mb-4">📜 Active Scenarios</h3>
                 <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {history.map((h, i) => (
-                    <div key={h.id} className="p-3 text-sm bg-slate-50 rounded-lg border border-slate-100 flex justify-between">
-                       <div><span className="font-bold block text-slate-700">#{history.length - i} {h.inputs.company_name}</span></div>
-                       <div className={`font-bold ${h.result.net_profit_monthly > 0 ? 'text-green-600' : 'text-red-500'}`}>{h.result.net_profit_monthly > 0 ? '+' : ''}{(h.result.net_profit_monthly/1000).toFixed(1)}k</div>
+                  {Object.entries(history)
+                    .sort(([,a], [,b]) => b.updatedAt - a.updatedAt) // Sort by newest first
+                    .map(([company, h]) => (
+                    <div key={company} className="p-3 text-sm bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
+                       <div>
+                           <span className="font-bold block text-slate-700">{company}</span>
+                           <span className="text-xs text-slate-400">Updated: {new Date(h.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                       </div>
+                       <div className={`font-bold ${h.result.net_profit_monthly > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                           {h.result.net_profit_monthly > 0 ? '+' : ''}{(h.result.net_profit_monthly/1000).toFixed(1)}k
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -181,7 +210,7 @@ function Simulator() {
             )}
         </div>
 
-        {/* RESULTS */}
+        {/* RIGHT COLUMN: RESULTS */}
         <div className="lg:col-span-8 space-y-6">
            {result ? (
              <>
