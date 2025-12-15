@@ -73,7 +73,7 @@ function Simulator() {
   const handleSimulate = async () => {
     try {
       // Change this line in Simulator.jsx
-const response = await axios.post('https://your-new-vercel-url.vercel.app/simulate', inputs);
+const response = await axios.post('https://quick-commerce-backend-livid.vercel.app/simulate', inputs);
       setResult(response.data);
     } catch (error) {
       console.error("Connection Error", error);
