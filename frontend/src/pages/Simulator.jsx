@@ -103,7 +103,7 @@ const response = await axios.post('https://quick-commerce-backend-livid.vercel.a
     <div className="p-8 fade-in">
       <header className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Profitability Simulator</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Profitability Simulator - by Sonakshi Karanwal - XW035-25</h2>
           <p className="text-slate-500 text-sm">Adjust levers to analyze unit economics viability.</p>
         </div>
         <button onClick={saveScenario} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition">
