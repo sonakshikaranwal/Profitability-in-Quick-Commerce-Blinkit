@@ -65,22 +65,32 @@ function Simulator() {
     return () => clearTimeout(timer);
   }, [inputs]);
 
-  // --- THE NEW SAVE FUNCTION ---
-  const saveScenario = async () => {
+  const saveScenario = () => {
     if (!result) return;
     
-    // 1. Save to Sidebar History (Visual only)
+    // 1. Visual Feedback
     setHistory(prev => [{ inputs: { ...inputs }, result: { ...result }, id: Date.now() }, ...prev]);
 
-    // 2. Save to Backend Cache (Updates Market Analysis Page)
     try {
-        setSavedStatus("Saving to Market Analysis...");
-        // CHANGE URL to your Vercel Backend
-        await axios.post('https://quick-commerce-backend-livid.vercel.app/save-scenario', {
-            company_name: inputs.company_name,
-            data: result
-        });
-        setSavedStatus("✅ Saved to Market Cache!");
+        setSavedStatus("Saving...");
+        
+        // 2. READ EXISTING DATA
+        const existingData = JSON.parse(localStorage.getItem('marketData') || '{}');
+        
+        // 3. UPDATE THIS COMPANY
+        existingData[inputs.company_name] = {
+            ...result,
+            // Ensure we save the AI verdict text too
+            strategic_verdict: result.strategic_verdict, 
+            net_profit_monthly: result.net_profit_monthly,
+            contribution_margin: result.contribution_margin,
+            break_even_orders: result.break_even_orders
+        };
+
+        // 4. WRITE PERMANENTLY TO BROWSER
+        localStorage.setItem('marketData', JSON.stringify(existingData));
+
+        setSavedStatus("✅ Saved to Browser Memory!");
         setTimeout(() => setSavedStatus(""), 3000);
     } catch (error) {
         setSavedStatus("❌ Save Failed");
