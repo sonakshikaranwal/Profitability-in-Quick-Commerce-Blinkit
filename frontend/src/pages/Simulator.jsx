@@ -72,7 +72,8 @@ function Simulator() {
 
   const handleSimulate = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/simulate', inputs);
+      // Change this line in Simulator.jsx
+const response = await axios.post('https://your-new-vercel-url.vercel.app/simulate', inputs);
       setResult(response.data);
     } catch (error) {
       console.error("Connection Error", error);

@@ -6,14 +6,18 @@ from services.ai_engine import generate_strategic_insight
 
 app = FastAPI()
 
-# Allow frontend to talk to backend
+# CORS: Allow requests from your local frontend AND your future deployed frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows all origins (simplest for deployment)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
+
+@app.get("/")
+def read_root():
+    return {"status": "active", "message": "Profitability Engine API is running"}
 
 @app.post("/simulate", response_model=SimulationResult)
 def simulate_strategy(data: SimulationInput):
@@ -32,7 +36,3 @@ def simulate_strategy(data: SimulationInput):
         "strategic_verdict": verdict,
         "ai_recommendation": recommendation
     }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
